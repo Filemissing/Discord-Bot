@@ -2,6 +2,7 @@
 import asyncio
 import json
 import aiohttp
+import os
 
 import discord
 from discord import channel
@@ -51,7 +52,5 @@ async def reload_module(ctx: commands.Context, name: str):
     except Exception as e:
         await ctx.send(f"❌ Error reloading `{name}`:\n```{e}```", ephemeral=True)
 
-with open("config.json") as file:
-    config = json.load(file)
-
-bot.run(config["token"])
+TOKEN = os.environ['DISCORD_TOKEN']
+bot.run(TOKEN)
