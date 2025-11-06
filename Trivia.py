@@ -1,7 +1,7 @@
 ﻿from email.errors import MessageError
 import html
 import aiohttp
-from discord import app_commands
+from discord import app_commands, emoji
 import discord
 from discord.ext import commands, tasks
 import asyncio
@@ -45,35 +45,37 @@ class Trivia(commands.Cog):
     async def start_trivia(self, interaction: discord.Interaction, category: str = "0", difficulty: str = "any", question_type: str = "any"):
         async with aiohttp.ClientSession() as session:
             async with session.get(self.api_token_request) as resp:
-                data = resp.json()
+                data = await resp.json()
                 if data["response_code"] == 0:
                     session_token = data["token"]
                 else:
-                    interaction.response.send_message(":x: Failed to get token, try again in a few seconds")
+                    interaction.response.send_message("❌ Failed to get token, try again in a few seconds")
                     return
 
 
         question_data = await self.get_question(interaction, session_token, int(category), difficulty, question_type)
 
         question = html.unescape(question_data["question"])
-        answers: list = question_data["incorrect_answers"] + [question_data["correct_answer"]]
+        answers: list = [html.unescape(answer) for answer in question_data["incorrect_answers"] + [question_data["correct_answer"]]]
 
         answers.sort(reverse=True)
 
-        message = f"Question: {question}\n\nAnswers:\n"
+        message_text = f"Question: {question}\n\nAnswers:\n"
 
         index = 1
         for answer in answers:
-            message += f"{index}: {html.unescape(answer)}\n"
+            message_text += f"{index}: {html.unescape(answer)}\n"
             index += 1
 
-        message = await interaction.response.send_message(message)
+        message = await interaction.response.send_message(message_text)
 
         self.active_trivia[interaction.channel_id] = {
             "session_id": 0, # actually implement session tokens later
-            "answer": question_data["correct_answer"],
+            "answer": html.unescape(question_data["correct_answer"]),
+            "incorrect_answers": [html.unescape(answer) for answer in question_data["incorrect_answers"]],
             "timeout": asyncio.get_event_loop().time() + 20,
-            "message_id": message.message_id
+            "message_id": message.message_id,
+            "responses": {}
             }
 
         if not self.monitor_channel.is_running():
@@ -86,7 +88,7 @@ class Trivia(commands.Cog):
             channel = self.bot.get_channel(channel_id)
 
             if session["timeout"] < asyncio.get_event_loop().time():
-                await channel.send(f"⏰ Time's up! The correct answer was **{session['answer']}**")
+                await channel.get_partial_message(session["message_id"]).reply(f"⏰ Time's up! The correct answer was **{session['answer']}**")
                 to_remove.append(channel_id)
 
         for ch_id in to_remove:
@@ -101,8 +103,14 @@ class Trivia(commands.Cog):
 
         session = self.active_trivia.get(message.channel.id)
         if not session: return
-        if message.content.lower().strip() == session["answer"].lower().strip():
-            message.reply(message.author.mention + "✅ Correct")
+
+        text = message.content.lower().strip()
+
+        if text == session["answer"].lower().strip():
+            del self.active_trivia[message.channel.id]
+            await message.reply("✅ Correct")
+        elif text in [answer.lower().strip() for answer in session["incorrect_answers"]]:
+            await message.add_reaction("❌")
 
     async def get_question(self, interaction: discord.Interaction, session_token: str, category_id: int = 0, difficulty: str = "any", question_type: str = "any"):
         url = self.api_base + "amount=1"
@@ -117,7 +125,7 @@ class Trivia(commands.Cog):
 
                 code = data["response_code"]
                 if code != 0:
-                    print(f":x: Error: {self.error_messages[code]}")
+                    print(f"❌ Error: {self.error_messages[code]}")
                     return False
 
                 return data["results"][0]
