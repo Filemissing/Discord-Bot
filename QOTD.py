@@ -10,7 +10,7 @@ from discord import mentions
 from discord.ext import commands, tasks
 from discord import app_commands
 
-question_time = datetime(hour=18)
+question_time = datetime.time(hour=18)
 
 class QOTD(commands.Cog):
     def __init__(self, bot):
