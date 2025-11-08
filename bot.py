@@ -10,7 +10,11 @@ from discord import mentions
 from discord.ext import commands, tasks
 from discord import app_commands
 
-bot = commands.Bot(command_prefix='haj ', intents=discord.Intents.all())
+intents = discord.Intents.default()
+intents.guilds = True
+intents.message_content = True
+
+bot = commands.Bot(command_prefix='haj ', intents=intents)
 
 QOTD_CHANNEL_ID = 1433040386359824494
 
