@@ -1,6 +1,7 @@
-from datetime import datetime, time, timedelta
+import datetime
 import asyncio
 import json
+from time import timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import aiohttp
 
@@ -10,7 +11,7 @@ from discord import mentions
 from discord.ext import commands, tasks
 from discord import app_commands
 
-question_time = datetime.time(hour=18)
+time = datetime.time(hour=18, minute=0)
 
 class QOTD(commands.Cog):
     def __init__(self, bot):
@@ -30,7 +31,7 @@ class QOTD(commands.Cog):
         self.channel_ids[interaction.guild_id] = channel.id
         await interaction.response.send_message(f"Updated QOTD channel to {channel.jump_url}", ephemeral=True)
 
-    @tasks.loop(time=question_time)
+    @tasks.loop(time=time)
     async def post_qotd(self):
         question = self.questions[self.question_index]
 
